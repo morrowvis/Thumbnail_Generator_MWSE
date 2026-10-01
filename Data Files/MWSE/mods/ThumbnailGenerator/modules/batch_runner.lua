@@ -81,19 +81,25 @@ local function thumbnailExists(subject, meshPath)
     return footer == pngFooter
 end
 
--- Reads the flagged list (one pattern per line) from the output folder and
--- compiles it into a single predicate: a record is flagged if any line matches it
--- under the shared search semantics (substring / glob / comma AND-terms), so an
--- entry like "f\furn_com_bar_0" flags every numbered variant and the trailing
--- ".nif" is optional. Blank lines and "#" comments are ignored. Returns the
--- matcher, the file path, and the pattern count (nil matcher if the file is absent).
+-- Reads the flagged list (the TOML file's `meshes` ''' block, one pattern per line)
+-- from the output folder and compiles it into a single predicate: a record is
+-- flagged if any line matches it under the shared search semantics (substring /
+-- glob / comma AND-terms), so an entry like "f\furn_com_bar_0" flags every
+-- numbered variant and the trailing ".nif" is optional. Blank lines and "#"
+-- comments are ignored. Returns the matcher, the file path, the pattern count,
+-- and an error message (nil matcher if the file is absent or unparseable).
 local function readFlaggedMatcher()
-    local path = settings.getOutputFolder() .. "\\" .. (settings.current.flaggedMeshesFile or "flagged_meshes.txt")
-    local file = io.open(path, "r")
-    if not file then return nil, path end
+    local path = settings.getOutputFolder() .. "\\" .. (settings.current.flaggedMeshesFile or "flagged_meshes.toml")
+    local data, err = toml.loadFile(path)
+    if not data then
+        if err and err.reason ~= "Could not open file." then
+            return nil, path, 0, "Flagged file could not be parsed:\n" .. path .. "\n" .. tostring(err.reason or err)
+        end
+        return nil, path, 0, "Flagged file not found:\n" .. path
+    end
 
     local matchers = {}
-    for line in file:lines() do
+    for line in tostring(data.meshes or ""):gmatch("[^\r\n]+") do
         line = line:gsub("^%s+", ""):gsub("%s+$", "")
         if line ~= "" and line:sub(1, 1) ~= "#" then
             -- Entries may carry a leading "meshes\"; record mesh paths don't.
@@ -102,7 +108,6 @@ local function readFlaggedMatcher()
             if matcher then table.insert(matchers, matcher) end
         end
     end
-    file:close()
 
     local flaggedMatcher = function(obj)
         for _, matcher in ipairs(matchers) do
@@ -442,9 +447,9 @@ function this.renderBatch(params)
     -- Flagged run: restrict to records matching a pattern in the flagged file.
     local flaggedMatcher
     if params.flaggedOnly then
-        local matcher, path, count = readFlaggedMatcher()
+        local matcher, _, count, err = readFlaggedMatcher()
         if not matcher then
-            if params.onError then params.onError("Flagged file not found:\n" .. tostring(path)) end
+            if params.onError then params.onError(err) end
             return
         end
         if count == 0 then

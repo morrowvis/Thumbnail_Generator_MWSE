@@ -13,7 +13,7 @@ local config = {
     -- =============================================================================
 
     outputFolder = "Thumbnail Generator",
-    flaggedMeshesFile = "flagged_meshes.txt",
+    flaggedMeshesFile = "flagged_meshes.toml",
     useSavedConfig = false,
 
     resolutionOptions = { 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384 },
