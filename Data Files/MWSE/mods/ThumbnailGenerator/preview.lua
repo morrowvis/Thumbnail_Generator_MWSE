@@ -866,7 +866,7 @@ function this.open(objOrSubject, options)
             end
         end)
 
-        -- Rotation mode: add the saved yaw on top of rotation_exceptions.txt
+        -- Rotation mode: add the saved yaw on top of the rotation exceptions
         -- corrections (current behavior), or replace those corrections entirely.
         local rotationMode = "add"
         local rotHint = pContents:createLabel({ text = "Rotations:" })

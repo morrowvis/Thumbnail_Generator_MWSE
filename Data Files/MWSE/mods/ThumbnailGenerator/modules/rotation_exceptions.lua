@@ -4,9 +4,10 @@ local this = {}
 local exceptions = {}
 this.exceptions = exceptions
 
-this.filePath = "data files\\MWSE\\mods\\ThumbnailGenerator\\rotation_exceptions.txt"
+this.luaModKey = "ThumbnailGenerator"
+this.metadataKey = "Thumbnail Generator"
 
-function this.addEntry(rotation, path, source)
+function this.addEntry(rotation, path)
     local norm = path:gsub("\\", "/"):lower()
     norm = norm:match("^%s*(.-)%s*$")
     norm = norm:gsub("%.[nN][iI][fF]$", "")
@@ -28,13 +29,15 @@ function this.addEntry(rotation, path, source)
         file = norm
     end
 
-    table.insert(exceptions, { dir = dir, file = file, rotation = rotation, source = source or "custom" })
+    table.insert(exceptions, { dir = dir, file = file, rotation = rotation })
 end
 
 
-function this.loadFromFile(path)
-    local file = io.open(path, "r")
-    if not file then
+-- Groups live in the mod's metadata file; array-of-tables order is kept so later entries still win.
+function this.loadFromMetadata()
+    local metadata = tes3.getLuaModMetadata(this.luaModKey) or toml.loadMetadata(this.metadataKey)
+    local groups = metadata and metadata.tools and metadata.tools["thumbnail-generator"]
+    if type(groups) ~= "table" then
         return false
     end
 
@@ -42,26 +45,15 @@ function this.loadFromFile(path)
         table.remove(exceptions, i)
     end
 
-    local currentRotation = nil
-    local currentSource = "custom"
-
-    for line in file:lines() do
-        line = line:match("^%s*(.-)%s*$")
-
-        if line == "" then
-        elseif line:sub(1, 1) == "#" then
-            currentSource = line:sub(2):match("^%s*(.-)%s*$"):lower()
-        else
-            local rotateHeader = line:lower():match("^rotate%s+(%d+)%s*:")
-            if rotateHeader then
-                currentRotation = tonumber(rotateHeader)
-            elseif currentRotation then
-                this.addEntry(currentRotation, line, currentSource)
+    for _, group in ipairs(groups) do
+        local rotation = tonumber(group.rotate)
+        if rotation and type(group.meshes) == "table" then
+            for _, path in ipairs(group.meshes) do
+                this.addEntry(rotation, path)
             end
         end
     end
 
-    file:close()
     return true
 end
 
@@ -97,18 +89,14 @@ function this.match(normalizedMeshPath)
         rotation = best.rotation,
         dir = best.dir,
         file = best.file,
-        source = best.source,
-        provenance = string.format(
-            "mesh exception: rotate %d (fragment '%s' in dir '%s', %s)",
-            best.rotation, best.file, best.dir == "" and "<root>" or best.dir, best.source),
     }
 end
 
 
-if not this.loadFromFile(this.filePath) then
+if not this.loadFromMetadata() then
     mwse.log(string.format(
-        "[Thumbnail Generator] rotation_exceptions.lua: could not open '%s' -- no rotation exceptions loaded.",
-        this.filePath))
+        "[Thumbnail Generator] rotation_exceptions.lua: no [[tools.thumbnail-generator]] rotation groups in '%s-metadata.toml' -- no rotation exceptions loaded.",
+        this.metadataKey))
 end
 
 

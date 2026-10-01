@@ -1,10 +1,10 @@
-<h1 align="center">Thumbnail Generator</h1>
+<h1 align="center">Thumbnail Generator (MWSE)</h1>
 <p align="center">
-  <a href="https://github.com/morrowvis/Thumbnail_Generator/releases">Download</a> ·
+  <a href="https://github.com/morrowvis/Thumbnail_Generator_MWSE/releases">Download</a> ·
   <a href="https://ms-arch.gitbook.io/morrowvis/thumbnail-generator/functions">Documentation</a>
-</p
+</p>
 
-MWSE mod that renders thumbnails from in-game.
+Mod that renders and previews thumbnails.
 
 Made with contributions from [Greatness7](https://github.com/Greatness7). 
 

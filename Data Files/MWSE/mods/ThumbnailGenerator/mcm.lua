@@ -148,7 +148,7 @@ function this.registerModConfig()
 
     group:createYesNoButton({
         label = "Render Only Rotation Exceptions",
-        description = "When enabled, batch rendering skips every mesh that has no entry in rotation_exceptions.txt.\n\z
+        description = "When enabled, batch rendering skips every mesh that has no rotation exception in the metadata file.\n\z
             Useful for re-rendering just the items that needed a manual rotation correction after editing that file.",
         variable = mwse.mcm.createTableVariable({ id = "renderOnlyRotationExceptions", table = settings.current }),
     })
