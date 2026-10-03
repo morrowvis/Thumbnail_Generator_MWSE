@@ -71,7 +71,6 @@ end
 
 -- Scene construction/normalization lives in modules/scene_builder; re-exported
 -- here so every caller keeps going through render.
-this.createActorScene = scene_builder.createActorScene
 this.createRenderableScene = scene_builder.createRenderableScene
 this.createRootNode = scene_builder.createRootNode
 this.adaptParticleBlends = scene_builder.adaptParticleBlends

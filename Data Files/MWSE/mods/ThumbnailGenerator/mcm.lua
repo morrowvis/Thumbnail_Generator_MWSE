@@ -100,17 +100,6 @@ function this.registerModConfig()
     local group = settingsPage:createCategory("Batch")
 
     group:createDropdown({
-        label = "Mode",
-        description = "Thumbnails: render images into the output folder (default).\nExport: save each matched subject as a .nif under <output folder>\\exports instead of rendering images.",
-        options = {
-            { label = "Thumbnails", value = "thumbnails" },
-            { label = "Export",     value = "export" },
-        },
-        variable = mwse.mcm.createTableVariable({ id = "batchMode", table = settings.current }),
-    })
-
-
-    group:createDropdown({
         label = "Render Resolution",
         description = "Offscreen render target size used for batch rendering.",
         options = resolutionOptions,
@@ -158,7 +147,7 @@ function this.registerModConfig()
         description = "Enabled: an NPC is only batch rendered if it is flagged as respawning and has no attached script, and a small blacklist of duplicate guard/ordinator records is skipped. \z
             That keeps the generic population and drops unique characters.\n\z
             Disabled: every NPC record is rendered.\n\z
-            Two config.lua keys tune it further: npcRequireRespawn drops the respawn half of the check, and an id containing npcIncludePattern (default \"outfit\") is rendered either way. Export mode ignores the filter entirely.",
+            Two config.lua keys tune it further: npcRequireRespawn drops the respawn half of the check, and an id containing npcIncludePattern (default \"outfit\") is rendered either way.",
         variable = mwse.mcm.createTableVariable({ id = "npcFiltering", table = settings.current }),
     })
 
@@ -198,30 +187,6 @@ function this.registerModConfig()
         label = "Use Profiles",
         description = "Apply camera and lighting saved from the preview's Save Profile button, in both batch renders and previews.",
         variable = mwse.mcm.createTableVariable({ id = "useProfiles", table = settings.current }),
-    })
-
-    group = settingsPage:createCategory("Export")
-
-    group:createDropdown({
-        label = "Export Filename",
-        description = "Filename used when exporting:\n\z
-            the record's display name, its record id, or the mesh file's base name (NPCs fall back to their id).",
-        options = {
-            { label = "ID", value = "id" },
-            { label = "Name", value = "name" },
-            { label = "Mesh", value = "mesh" },
-        },
-        variable = mwse.mcm.createTableVariable({ id = "exportFilename", table = settings.current }),
-    })
-
-    group:createSlider({
-        label = "NPC Variants",
-        description = "Maximum copies to export for an NPC whose equipment comes from a levelled list, each a separate roll.",
-        min = 1,
-        max = 5,
-        step = 1,
-        jump = 1,
-        variable = mwse.mcm.createTableVariable({ id = "npcVariants", table = settings.current }),
     })
 
     mwse.mcm.register(template)

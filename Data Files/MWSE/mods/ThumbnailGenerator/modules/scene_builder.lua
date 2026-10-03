@@ -91,10 +91,7 @@ end
 
 -- Actor visuals/animations are wired up at instancing time, not on the record:
 -- spawn a temporary reference, pose it, clone the scene node, delete the reference.
--- `forceItems` is an optional list of item ids to equip on the instance before
--- it is posed, so an NPC with levelled gear can be exported wearing a chosen
--- outfit instead of whatever the engine happened to roll.
-function this.createActorScene(actor, forceItems, restPose)
+function this.createActorScene(actor)
     local player = tes3.player
     local ref = tes3.createReference({
         object = actor,
@@ -107,15 +104,6 @@ function this.createActorScene(actor, forceItems, restPose)
     local ok, result = pcall(function()
         if not ref or not ref.sceneNode then
             error("Failed to instance actor reference: " .. tostring(actor.id))
-        end
-
-        -- Equipping replaces whatever the levelled list rolled into the same
-        -- slot. Done before the pose so the body parts are already swapped.
-        for _, id in ipairs(forceItems or {}) do
-            pcall(tes3.equip, {
-                reference = ref, item = id, addItem = true,
-                bypassEquipEvents = true, playSound = false,
-            })
         end
 
         -- Idle loop midpoint = settled stance; engine timing is the fallback.
@@ -148,18 +136,6 @@ function this.createActorScene(actor, forceItems, restPose)
 
         if poseTime then
             ref.sceneNode:update({ controllers = true, time = poseTime })
-        end
-
-        -- For an EXPORT the saved node transforms become the armature rest
-        -- pose in Unreal, and actors only share a skeleton when every rig
-        -- matches the shared set bone-for-bone (1e-3). The idle midpoint above
-        -- leaves each capture ~5.53 deg from base_anim's own rest, which fails
-        -- that and drops every NPC to its own skeleton and its own copy of the
-        -- animation. Frame 0 of the base animation IS base_anim's authored
-        -- pose (within 0.03 deg), so re-pose to it just before the clone.
-        -- Thumbnails do not pass restPose and keep the settled midpoint stance.
-        if restPose then
-            ref.sceneNode:update({ controllers = true, time = 0 })
         end
 
         local clone = ref.sceneNode:clone()

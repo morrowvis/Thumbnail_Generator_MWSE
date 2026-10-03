@@ -6,9 +6,6 @@ local renderer = require("ThumbnailGenerator.render")
 local thumbnail_settings = require("ThumbnailGenerator.modules.thumbnail_settings")
 local subject_resolver = require("ThumbnailGenerator.modules.subject_resolver")
 local rotation_exceptions = require("ThumbnailGenerator.modules.rotation_exceptions")
-local scene_builder = require("ThumbnailGenerator.modules.scene_builder")
-local actors_metadata = require("ThumbnailGenerator.modules.actors_metadata")
-local npc_variants = require("ThumbnailGenerator.modules.npc_variants")
 local settings = thumbnail_settings
 local ir = require("image_resize.image_resize")
 
@@ -148,72 +145,6 @@ local function writeBatchLogs(batch)
 end
 
 
--- Exports a single subject as a .nif file into <output>\exports, mirroring the
--- preview's Export button. Returns the written path, or errors on failure.
--- An NPC with levelled equipment may write several files (see npc_variants);
--- the last path is returned.
-local function exportSubject(subject)
-    local obj = subject.object
-
-    local mode = settings.current.exportFilename
-    local rawName
-    if mode == "id" then
-        rawName = subject.recordId or subject.displayName
-    elseif mode == "mesh" then
-        if obj and obj.objectType == tes3.objectType.npc then
-            rawName = subject.recordId
-        else
-            local meshPath = subject.normalizedMeshPath
-            if meshPath and meshPath ~= "" then
-                rawName = meshPath:match("[^/]+$") or meshPath
-            end
-            rawName = rawName or subject.recordId or subject.displayName
-        end
-    else
-        rawName = subject.displayName or subject.recordId
-    end
-    rawName = rawName or "export"
-    local baseName = rawName:gsub("[^%w %._-]", "_")
-
-    local exportDir = settings.getOutputFolder() .. "\\exports"
-    renderer.ensureDirectory(exportDir .. "\\")
-
-    -- Outfits are chosen up front, so the file count always matches the plan.
-    -- An empty plan means one export, unchanged.
-    local picks = npc_variants.plan(obj)
-    local total = math.max(#picks, 1)
-    local lastPath
-
-    for i = 1, total do
-        local exportRoot
-
-        if obj and (obj.objectType == tes3.objectType.npc
-                or obj.objectType == tes3.objectType.creature) then
-            local wrapper = scene_builder.createActorScene(obj, picks[i], true)
-            exportRoot = wrapper.children[1]
-            wrapper:detachChild(exportRoot)
-        else
-            local mesh = tes3.loadMesh(subject.meshPath)
-            if not mesh then
-                error("Failed to load mesh: " .. tostring(subject.meshPath))
-            end
-            exportRoot = mesh:clone()
-        end
-
-        exportRoot.translation = tes3vector3.new(0, 0, 0)
-        exportRoot.name = npc_variants.name(baseName, i, total)
-        lastPath = (exportDir .. "\\" .. exportRoot.name .. ".nif"):gsub("[/\\]+", "\\")
-        actors_metadata.attach(obj, exportRoot)
-        exportRoot:update()
-        exportRoot:saveBinary(lastPath)
-
-        exportRoot = nil
-        if i < total then npc_variants.releaseBetweenRolls() end
-    end
-
-    return lastPath, total
-end
-
 -- Two phases per frame: reclaim completed compression jobs, then submit new
 -- render jobs up to poolSize. Unregisters itself once the batch completes.
 local function onFrame()
@@ -223,9 +154,9 @@ local function onFrame()
     end
 
     local batch = activeBatch
-    local pool = batch.batchMode ~= "export" and getPixelPool(batch.resolution) or nil
+    local pool = getPixelPool(batch.resolution)
 
-    local completed = pool and pool:pollCompleted()
+    local completed = pool:pollCompleted()
     while completed do
         local key = tostring(completed.job_id)
         local item = batch.activeJobs[key]
@@ -241,33 +172,10 @@ local function onFrame()
                 table.insert(batch.failedEntries, logEntry(item))
             end
         end
-        completed = pool and pool:pollCompleted()
+        completed = pool:pollCompleted()
     end
 
     local lastSubmittedIndexThisFrame = nil
-
-    -- Export mode: process synchronously, no pool needed.
-    if batch.batchMode == "export" then
-        -- Process up to ~20 exports per frame to keep the game responsive.
-        local perFrame = 20
-        local processed = 0
-        while batch.nextIndex <= #batch.items
-                and batch.completedCount < batch.remainingToRender
-                and processed < perFrame do
-            local subject = batch.items[batch.nextIndex]
-            local ok, result = pcall(exportSubject, subject)
-            if ok then
-                batch.successCount = batch.successCount + 1
-            else
-                mwse.log("[Thumbnail Generator] Export failed for %s: %s",
-                    logEntry(subject), tostring(result))
-                table.insert(batch.failedEntries, logEntry(subject))
-            end
-            batch.completedCount = batch.completedCount + 1
-            batch.nextIndex = batch.nextIndex + 1
-            processed = processed + 1
-        end
-    else
 
     while batch.activeJobsCount < poolSize and batch.nextIndex <= #batch.items and batch.completedCount + batch.activeJobsCount < batch.remainingToRender do
         local slotIndex, slotObject = pool:acquire()
@@ -367,8 +275,6 @@ local function onFrame()
 
         batch.nextIndex = batch.nextIndex + 1
     end
-
-    end -- batchMode == "export" else
 
     if lastSubmittedIndexThisFrame then
         batch.camera.scene = batch.oldScene
@@ -470,8 +376,6 @@ function this.renderBatch(params)
     end
 
     -- Deduplicated by mesh path -- records sharing a mesh render once.
-    -- In export mode, each record gets its own file, so dedupe by record id only.
-    local isExportMode = (settings.current.batchMode == "export")
     local subjects = {}
     local seenMeshes = {}
 
@@ -479,11 +383,8 @@ function this.renderBatch(params)
         for obj in tes3.iterateObjects(objType) do
             local isActor = objType == tes3.objectType.npc or objType == tes3.objectType.creature
             -- One render per base record: skip per-placement instances and filtered NPCs.
-            -- Export mode bypasses npcFiltering so every NPC record is exported,
-            -- matching the preview which exports any NPC you open regardless of filter.
             local skip = (isActor and obj.isInstance == true)
-                or (not isExportMode
-                    and objType == tes3.objectType.npc
+                or (objType == tes3.objectType.npc
                     and settings.current.npcFiltering and not npcPassesFilter(obj))
 
             local mesh = not skip and obj.mesh
@@ -492,28 +393,20 @@ function this.renderBatch(params)
 
                 if matches then
                     local meshKey = subject_resolver.normalizeMeshPath(mesh)
-                    -- In export mode dedupe by record id (each record is a separate file).
-                    -- In thumbnail mode dedupe by mesh (records sharing a mesh write once).
-                    local dedupeKey
-                    if isExportMode then
-                        dedupeKey = (obj.id or ""):lower()
-                    elseif objType == tes3.objectType.npc then
-                        -- NPCs share base skeleton meshes (looks are composited at
-                        -- instancing), so dedupe them by record id instead of mesh.
+                    -- NPCs share base skeleton meshes (looks are composited at
+                    -- instancing), so dedupe them by record id instead of mesh.
+                    local dedupeKey = meshKey
+                    if objType == tes3.objectType.npc then
                         dedupeKey = "npc:" .. (obj.id or ""):lower()
-                    else
-                        dedupeKey = meshKey
                     end
                     if dedupeKey ~= "" and not seenMeshes[dedupeKey] then
-                        local skipRecord = (not isExportMode and settings.current.renderOnlyRotationExceptions
+                        local skipRecord = (settings.current.renderOnlyRotationExceptions
                                 and not rotation_exceptions.match(meshKey))
                             or (flaggedMatcher and not flaggedMatcher(obj))
                         if not skipRecord then
                             seenMeshes[dedupeKey] = true
                             local subject = subject_resolver.resolve(obj)
-                            -- skipExistingThumbnails only applies to thumbnail mode.
-                            local skipExisting = not isExportMode
-                                and settings.current.skipExistingThumbnails
+                            local skipExisting = settings.current.skipExistingThumbnails
                                 and thumbnailExists(subject, mesh)
                             if not skipExisting then
                                 table.insert(subjects, subject)
@@ -551,7 +444,6 @@ function this.renderBatch(params)
         totalItems = #subjects,
         startIndex = startIndex,
         remainingToRender = remainingToRender,
-        batchMode = settings.current.batchMode or "thumbnails",
         resolution = resolution,
         dstWidth = params.dstWidth or params.dstResolution or 1024,
         dstHeight = params.dstHeight or params.dstResolution or 1024,
@@ -572,8 +464,8 @@ function this.renderBatch(params)
         onError = params.onError,
     }
 
-    mwse.log("[Thumbnail Generator] Starting batch: mode=%s, subjects=%d, remainingToRender=%d",
-        settings.current.batchMode or "thumbnails", #subjects, remainingToRender)
+    mwse.log("[Thumbnail Generator] Starting batch: subjects=%d, remainingToRender=%d",
+        #subjects, remainingToRender)
 
     event.register("enterFrame", onFrame)
 end

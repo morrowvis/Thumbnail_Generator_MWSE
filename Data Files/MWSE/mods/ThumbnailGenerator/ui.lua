@@ -63,12 +63,7 @@ function this.openMenu()
     contents.autoHeight = true
     contents.borderAllSides = 12
 
-    -- One hint for both actions; the button says which one runs.
-    local function getTitleText()
-        return "Search (id/name/mesh path/.esp/.esm):"
-    end
-
-    local titleLabel = contents:createLabel({ text = getTitleText() })
+    local titleLabel = contents:createLabel({ text = "Search (id/name/mesh path/.esp/.esm):" })
     titleLabel.borderBottom = 15
 
     local inputBlock = contents:createBlock()
@@ -152,11 +147,7 @@ function this.openMenu()
     buttonBlock.childAlignX = 1.0
     buttonBlock.borderTop = 20
 
-    local function batchButtonText()
-        return settings.current.batchMode == "export" and "Export Batch" or "Render Batch"
-    end
-
-    local btnRender = buttonBlock:createButton({ text = batchButtonText() })
+    local btnRender = buttonBlock:createButton({ text = "Render Batch" })
     btnRender.borderRight = 10
 
     local btnFlagged = buttonBlock:createButton({ text = "Flagged" })
@@ -232,11 +223,7 @@ function this.openMenu()
     local function startBatch(extra)
         -- Drop keyboard focus so Space cancels the batch instead of typing a space.
         tes3ui.acquireTextInput(nil)
-        -- Capture mode now so the completion message matches what actually ran,
-        -- even if the MCM is changed while the batch is in flight.
-        local isExportMode = (settings.current.batchMode == "export")
-        btnRender.text = batchButtonText()
-        statusLabel.text = isExportMode and "Exporting batch... (Starting)" or "Rendering batch... (Starting)"
+        statusLabel.text = "Rendering batch... (Starting)"
         statusLabel.color = getColor("active_color")
         hintLabel.text = "Space to cancel"
         btnRender.visible = false
@@ -261,19 +248,13 @@ function this.openMenu()
                     resolution = settings.current.renderResolution,
                     dstResolution = settings.current.outputResolution,
                     onProgress = function(renderedCount, totalToRender)
-                        local verb = isExportMode and "Exporting" or "Rendering"
-                        statusLabel.text = string.format("%s batch... (%d/%d)", verb, renderedCount, totalToRender)
+                        statusLabel.text = string.format("Rendering batch... (%d/%d)", renderedCount, totalToRender)
                         menu:updateLayout()
                     end,
                     onComplete = function(totalFound, successCount, emptyCount, failedCount)
-                        local text
-                        if isExportMode then
-                            text = string.format("Exported %d files.", successCount)
-                        else
-                            text = string.format("Rendered %d thumbnails.", successCount)
-                            if emptyCount and emptyCount > 0 then
-                                text = text .. string.format(" %d empty renders skipped.", emptyCount)
-                            end
+                        local text = string.format("Rendered %d thumbnails.", successCount)
+                        if emptyCount and emptyCount > 0 then
+                            text = text .. string.format(" %d empty renders skipped.", emptyCount)
                         end
                         if failedCount and failedCount > 0 then
                             text = text .. string.format(" %d failed.", failedCount)
@@ -322,8 +303,7 @@ function this.openMenu()
         end
     end)
 
-    -- Only meshes listed in the flagged file, across all object types. Follows
-    -- the mode like the batch button, so flagged can be rendered or exported.
+    -- Only meshes listed in the flagged file, across all object types.
     btnFlagged:register(tes3.uiEvent.mouseClick, function()
         startBatch({ flaggedOnly = true })
     end)

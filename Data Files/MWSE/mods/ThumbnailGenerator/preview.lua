@@ -10,9 +10,6 @@ local preview_scene = require("ThumbnailGenerator.modules.preview_scene")
 local preview_pickers = require("ThumbnailGenerator.modules.preview_pickers")
 local profiles = require("ThumbnailGenerator.modules.profiles")
 local camera_profiles = require("ThumbnailGenerator.modules.camera_profiles")
-local scene_builder = require("ThumbnailGenerator.modules.scene_builder")
-local actors_metadata = require("ThumbnailGenerator.modules.actors_metadata")
-local npc_variants = require("ThumbnailGenerator.modules.npc_variants")
 
 local backgroundMenuID = "ThumbnailGen:PreviewBackground"
 local controlsMenuID = "ThumbnailGen:PreviewControls"
@@ -731,8 +728,8 @@ function this.open(objOrSubject, options)
     actionBlock.widthProportional = 1.0
     actionBlock.autoHeight = true
 
-    -- The two actions this window exists for, first in the block. Their handlers
-    -- are registered further down, once the functions they call are defined.
+    -- The action this window exists for, first in the block. Its handler is
+    -- registered further down, once the functions it calls are defined.
     local mainRow = actionBlock:createBlock()
     mainRow.flowDirection = tes3.flowDirection.leftToRight
     mainRow.widthProportional = 1.0
@@ -741,10 +738,6 @@ function this.open(objOrSubject, options)
 
     local btnRenderTest = mainRow:createButton({ text = "Render" })
     btnRenderTest.widthProportional = 1.0
-    btnRenderTest.borderRight = 6
-
-    local btnExport = mainRow:createButton({ text = "Export" })
-    btnExport.widthProportional = 1.0
 
     -- Save to session: copy the live preview's camera + lighting into the shared
     -- session config so batch renders adopt them (in memory only; not written to
@@ -973,96 +966,6 @@ function this.open(objOrSubject, options)
     local btnSaveProfile = profileRow:createButton({ text = "Save profile..." })
     btnSaveProfile.widthProportional = 1.0
     btnSaveProfile:register(tes3.uiEvent.mouseClick, openProfilePopup)
-
-    -- Export the currently open object as a .nif under "<output>/exports".
-    -- A basic clone: NPCs/creatures export their full posed hierarchy (skeleton
-    -- + skinned meshes, skin refs rebound by name -- the "standard" export),
-    -- everything else exports a plain clone of its mesh.
-    -- An NPC whose equipment comes from a levelled list can write several files,
-    -- one per distinct roll - see modules/npc_variants.lua. Returns the last path
-    -- written, and how many were written.
-    local function exportSubject()
-        local obj = subject.object
-
-        -- Filename per the MCM option: display name, record id, or mesh base name.
-        -- Each falls back so a missing value never yields an empty filename.
-        local mode = settings.current.exportFilename
-        local rawName
-        if mode == "id" then
-            rawName = subject.recordId or subject.displayName
-        elseif mode == "mesh" then
-            -- NPCs are assembled from many meshes, so there is no single mesh name
-            -- to use; fall back to the record id for them.
-            if obj and obj.objectType == tes3.objectType.npc then
-                rawName = subject.recordId
-            else
-                local meshPath = subject.normalizedMeshPath
-                if meshPath and meshPath ~= "" then
-                    rawName = meshPath:match("[^/]+$") or meshPath
-                end
-                rawName = rawName or subject.recordId or subject.displayName
-            end
-        else
-            rawName = subject.displayName or subject.recordId
-        end
-        rawName = rawName or "export"
-        local baseName = rawName:gsub("[^%w %._-]", "_")
-
-        local exportDir = settings.getOutputFolder() .. "\\exports"
-        render.ensureDirectory(exportDir .. "\\")
-
-        -- Outfits are chosen up front, so the file count always matches the plan.
-        -- An empty plan means one export, unchanged.
-        local picks = npc_variants.plan(obj)
-        local total = math.max(#picks, 1)
-        local lastPath
-
-        for i = 1, total do
-            local exportRoot
-
-            if obj and (obj.objectType == tes3.objectType.npc
-                    or obj.objectType == tes3.objectType.creature) then
-                -- true: export at the base animation's frame 0, not the idle
-                -- midpoint, so the saved node transforms match base_anim's own
-                -- rest and the actor can still share a skeleton in Unreal
-                local wrapper = scene_builder.createActorScene(obj, picks[i], true)
-                exportRoot = wrapper.children[1]
-                wrapper:detachChild(exportRoot)
-            else
-                local mesh = tes3.loadMesh(subject.meshPath)
-                if not mesh then
-                    error("Failed to load mesh: " .. tostring(subject.meshPath))
-                end
-                exportRoot = mesh:clone()
-            end
-
-            exportRoot.translation = tes3vector3.new(0, 0, 0)
-            exportRoot.name = npc_variants.name(baseName, i, total)
-            lastPath = (exportDir .. "\\" .. exportRoot.name .. ".nif"):gsub("[/\\]+", "\\")
-            actors_metadata.attach(obj, exportRoot)
-            exportRoot:update()
-            exportRoot:saveBinary(lastPath)
-
-            exportRoot = nil
-            if i < total then npc_variants.releaseBetweenRolls() end
-        end
-
-        return lastPath, total
-    end
-
-    btnExport:register(tes3.uiEvent.mouseClick, function()
-        local ok, result, count = pcall(exportSubject)
-        if ok then
-            if (count or 1) > 1 then
-                tes3.messageBox(string.format("Exported %d variants, last: %s",
-                    count, tostring(result)))
-            else
-                tes3.messageBox("Exported: " .. tostring(result))
-            end
-        else
-            tes3.messageBox("Error exporting: " .. tostring(result))
-        end
-    end)
 
     btnRenderTest:register(tes3.uiEvent.mouseClick, function()
         local mPath = subject.meshPath

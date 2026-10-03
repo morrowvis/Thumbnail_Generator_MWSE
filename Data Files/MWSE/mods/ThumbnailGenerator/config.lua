@@ -53,10 +53,6 @@ local config = {
     outputResolution = 1024,
     outputFormat = "png", -- "png", "tga" or "dds"
 
-    -- "thumbnails" (default): render PNGs/TGAs/DDSs into the output folder.
-    -- "export": save each subject as a .nif under <output>\exports instead.
-    batchMode = "thumbnails",
-
     skipEmptyRenders = true,
     skipExistingThumbnails = true,
     renderOnlyRotationExceptions = false,
@@ -75,16 +71,6 @@ local config = {
     previewOutputResolution = 1024,
     previewOutputFormat = "png",
     panSpeed = 0.75, -- subject radii per second
-
-    -- Filename used by the preview window's Export button: "name" (display name),
-    -- "id" (record id), or "mesh" (the mesh file's base name; NPCs fall back to id
-    -- since they have no single mesh).
-    exportFilename = "mesh",
-
-    -- Copies to export for an NPC whose equipment comes from a levelled list.
-    -- 1 = one export, as before. Rolls that come out wearing the same thing are
-    -- discarded, so this is a maximum, not a guarantee.
-    npcVariants = 1,
 
     -- Config-only (no MCM)
     previewForceVertexLighting = false,
