@@ -1,6 +1,6 @@
 [package]
 name = "Thumbnail Generator"
-version = "1.0.5"
+version = "1.0.6"
 description = "Mod that renders and previews thumbnails."
 repository = "https://github.com/morrowvis/Thumbnail_Generator_MWSE"
 authors = [
