@@ -4,7 +4,7 @@
   <a href="https://ms-arch.gitbook.io/morrowvis/thumbnail-generator/functions">Documentation</a>
 </p>
 
-Mod that renders and previews thumbnails.
+Mod that renders out and previews thumbnails.
 
 Made with contributions from [Greatness7](https://github.com/Greatness7). 
 
