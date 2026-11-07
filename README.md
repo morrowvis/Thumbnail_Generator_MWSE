@@ -1,7 +1,7 @@
 <h1 align="center">Thumbnail Generator (MWSE)</h1>
 <p align="center">
   <a href="https://github.com/morrowvis/Thumbnail_Generator_MWSE/releases">Download</a> ·
-  <a href="https://ms-arch.gitbook.io/morrowvis/thumbnail-generator/functions">Documentation</a>
+  <a href="https://morrowvis.com/documentation/tools/thumbnail-generator-mwse/">Documentation</a>
 </p>
 
 MWSE mod that renders out and previews thumbnails.
